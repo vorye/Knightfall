@@ -488,8 +488,8 @@ U64 bishop_masks[64];
 U64 rook_masks[64];
 
 // setting up attack tables
-U64 rook_table[64][512];
-U64 bishop_table[64][4096];
+U64 rook_table[64][4096];
+U64 bishop_table[64][512];
 
 
 
@@ -507,14 +507,14 @@ U64 masked_knight_attack(int space) {
     U64 attacks = 0ULL;
     U64 bitboard = 1ULL << space;
     
-    if (space <= 18 && (not_HG_column & (bitboard << 6))) attacks |= (bitboard << 6) & not_HG_column;
-    if (space <= 17 && (not_H_column & (bitboard << 15))) attacks |= (bitboard << 15) & not_H_column;
-    if (space >= 16 && (not_H_column & (bitboard >> 17))) attacks |= (bitboard >> 17) & not_H_column;
-    if (space >= 17 && (not_HG_column & (bitboard >> 10))) attacks |= (bitboard >> 10) & not_HG_column;
-    if (space >= 10 && (not_A_column & (bitboard >> 6))) attacks |= (bitboard >> 6) & not_A_column;
-    if (space >= 9 && (not_A_column & (bitboard << 10))) attacks |= (bitboard << 10) & not_A_column;
-    if (space <= 56 && (not_H_column & (bitboard >> 15))) attacks |= (bitboard >> 15) & not_H_column;
-    if (space <= 47 && (not_A_column & (bitboard << 17))) attacks |= (bitboard << 17) & not_A_column;
+    if ((bitboard >> 17) & not_H_column) attacks |= (bitboard >> 17);
+    if ((bitboard >> 15) & not_A_column) attacks |= (bitboard >> 15);
+    if ((bitboard >> 10) & not_HG_column) attacks |= (bitboard >> 10);
+    if ((bitboard >> 6) & not_AB_column) attacks |= (bitboard >> 6);
+    if ((bitboard << 17) & not_A_column) attacks |= (bitboard << 17);
+    if ((bitboard << 15) & not_H_column) attacks |= (bitboard << 15);
+    if ((bitboard << 10) & not_AB_column) attacks |= (bitboard << 10);
+    if ((bitboard << 6) & not_HG_column) attacks |= (bitboard << 6);
     
     return attacks;
 }
@@ -879,31 +879,35 @@ static inline U64 get_rook_attacks(int space, U64 occupancy){
 
 // get queen attacks
 
-static inline U64 get_queen_attacks(int space, U64 occupancy){
-
-    // initialise the results
-    U64 queen_attacks = 0Ull;
-
-    // initialise all of the bishop occupancies
-    U64 bishop_occupancy = occupancy & bishop_masks[space];
-    // initialise all of the rook occupancies
-    U64 rook_occupancy = occupancy & rook_masks[space];
-
-    // get the bishop attacks based on the occupancy
-    bishop_occupancy &= rook_masks[space];
-    bishop_occupancy *= rookmagics[space];
-    bishop_occupancy >>= 64 - rookspace[space];
+static inline U64 get_queen_attacks(int square, U64 occupancy)
+{
+    // init result attacks bitboard
+    U64 queen_attacks = 0ULL;
     
-    // get bishop attacks based on the occupancy
-    rook_occupancy &= bishop_masks[space];
-    rook_occupancy *= bishopmagics[space];
-    rook_occupancy >>= 64 - bishopspace[space];
-
-    // return the queen attacks
-    queen_attacks |= bishop_table[space][bishop_occupancy] | rook_table[space][rook_occupancy];
-
+    // init bishop occupancies
+    U64 bishop_occupancy = occupancy;
+    
+    // init rook occupancies
+    U64 rook_occupancy = occupancy;
+    
+    // get bishop attacks assuming current board occupancy
+    bishop_occupancy &= bishop_masks[square];
+    bishop_occupancy *= bishopmagics[square];
+    bishop_occupancy >>= 64 - bishopspace[square];
+    
+    // get bishop attacks
+    queen_attacks = bishop_table[square][bishop_occupancy];
+    
+    // get rook attacks assuming current board occupancy
+    rook_occupancy &= rook_masks[square];
+    rook_occupancy *= rookmagics[square];
+    rook_occupancy >>= 64 - rookspace[square];
+    
+    // get rook attacks
+    queen_attacks |= rook_table[square][rook_occupancy];
+    
+    // return queen attacks
     return queen_attacks;
-
 }
 
 
@@ -1293,10 +1297,13 @@ static inline void generate_moves(moves *move_list)
                             add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
                             
                             // two spaces ahead pawn move
-                            if ((source_space >= a7 && source_space <= h7) && !get_bit(occupancies[both], target_space + 8));
-                                add_move(move_list, encode_move(source_space, target_space + 8, piece, 0, 0, 1, 0, 0));
-                        }
-                    }
+                            if ((source_space >= a7 && source_space <= h7) && !get_bit(occupancies[both], target_space + 8)) {
+                            if (!get_bit(occupancies[both], target_space)) { // check if the square in front of the pawn is also unoccupied
+                            add_move(move_list, encode_move(source_space, target_space + 8, piece, 0, 0, 1, 0, 0));
+                         }
+                      }
+                  }
+               }
                     
                     // init pawn attacks bitboard
                     attacks = pawn_captures[side][source_space] & occupancies[white];
@@ -1355,8 +1362,9 @@ static inline void generate_moves(moves *move_list)
                     if (!get_bit(occupancies[both], f8) && !get_bit(occupancies[both], g8))
                     {
                         // make sure king and the f8 spaces are not under attacks
-                        if (!is_space_attacked(e8, white) && !is_space_attacked(f8, white))
-                            printf("e8g8  castling move\n");
+                        if (!is_space_attacked(e8, white) && !is_space_attacked(g8, white))
+                            add_move(move_list, encode_move(e8, g8, piece, 0, 0, 0, 0, 1));
+
                     }
                 }
                 
@@ -1368,7 +1376,7 @@ static inline void generate_moves(moves *move_list)
                     {
                         // make sure king and the d8 spaces are not under attacks
                         if (!is_space_attacked(e8, white) && !is_space_attacked(d8, white))
-                            printf("e8c8  castling move: \n");
+                        add_move(move_list, encode_move(e8, c8, piece, 0, 0, 0, 0, 1));
                     }
                 }
             }
@@ -1394,11 +1402,11 @@ static inline void generate_moves(moves *move_list)
                     
                     // quite move
                     if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_space))
-                        printf("%s%s  piece quiet move\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
                     
                     else
                         // capture move
-                        printf("%s%s  piece capture\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 1, 0, 0, 0));
                     
                     // pop ls1b in current attacks set
                     pop_bit(attacks, target_space);
@@ -1430,11 +1438,11 @@ static inline void generate_moves(moves *move_list)
                     
                     // quite move
                     if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_space))
-                        printf("%s%s  piece quiet move\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
                     
                     else
                         // capture move
-                        printf("%s%s  piece capture\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 1, 0, 0, 0));
                     
                     // pop ls1b in current attacks set
                     pop_bit(attacks, target_space);
@@ -1466,11 +1474,11 @@ static inline void generate_moves(moves *move_list)
                     
                     // quite move
                     if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_space))
-                        printf("%s%s  piece quiet move\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
                     
                     else
                         // capture move
-                        printf("%s%s  piece capture\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                    add_move(move_list, encode_move(source_space, target_space, piece, 0, 1, 0, 0, 0));
                     
                     // pop ls1b in current attacks set
                     pop_bit(attacks, target_space);
@@ -1502,11 +1510,11 @@ static inline void generate_moves(moves *move_list)
                     
                     // quite move
                     if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_space))
-                        printf("%s%s  piece quiet move\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                       add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
                     
                     else
                         // capture move
-                        printf("%s%s  piece capture\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 1, 0, 0, 0));
                     
                     // pop ls1b in current attacks set
                     pop_bit(attacks, target_space);
@@ -1538,11 +1546,11 @@ static inline void generate_moves(moves *move_list)
                     
                     // quite move
                     if (!get_bit(((side == white) ? occupancies[black] : occupancies[white]), target_space))
-                        printf("%s%s  piece quiet move\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
                     
                     else
                         // capture move
-                        printf("%s%s  piece capture\n", space_to_coordinates[source_space], space_to_coordinates[target_space]);
+                        add_move(move_list, encode_move(source_space, target_space, piece, 0, 1, 0, 0, 0));
                     
                     // pop ls1b in current attacks set
                     pop_bit(attacks, target_space);
@@ -1570,7 +1578,8 @@ int main()
     // init all
     init_all();
     // parse fen
-    parse_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPpP/R3K2R b KQkq a3 0 1 ");
+    parse_fen(tricky_position
+    );
 
     // create move list
     moves move_list[1];
@@ -1583,6 +1592,9 @@ print_move_list(move_list);
 
 // print a pawn_captures at a4
     print_board();
+// print the knight attacks at f6   
+    print_bitboard(masked_knight_attack(f6));
+ 
 return 0;
 }
 
