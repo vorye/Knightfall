@@ -1,7 +1,7 @@
 all:
-	gcc -oFast bchess.cpp -o bchess
-	x86_64-w64-mingw32-gcc -oFast bchess.cpp -o bchess.exe
+	g++ -Ofast bchess.cpp -o bchess 
+	x86_64-w64-mingw32-g++ -Ofast bchess.cpp -o Knightfall.exe
 
 debug:
-	gcc -oFast bchess.cpp -o bchess
-	x86_64-w64-mingw32-gcc bchess.cpp -o bchess.exe
+	g++ -Ofast -g bchess.cpp -o bchess 
+	x86_64-w64-mingw32-g++ -g bchess.cpp -o Knightfall.exe 
