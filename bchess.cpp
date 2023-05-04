@@ -1098,7 +1098,7 @@ void print_move_list(moves *move_list)
         
         #ifdef WIN64
             // print move
-            printf("      %s%s%c   %c         %d         %d         %d         %`d\n", space_to_coordinates[get_move_source(move)],
+            printf("      %s%s%c   %c         %d         %d         %d         %d\n", space_to_coordinates[get_move_source(move)],
                                                                                   space_to_coordinates[get_move_target(move)],
                                                                                   get_move_promoted(move) ? promoted_pieces[get_move_promoted(move)] : ' ',
                                                                                   ascii_pieces[get_move_piece(move)],
@@ -1186,7 +1186,7 @@ MOVE GENERATION + MOVE MAKING
 */
 
 // make move on chess board
-static  int make_move(int move, int move_flag)
+static int make_move(int move, int move_flag)
 {
     // quite moves
     if (move_flag == all_moves)
@@ -1229,13 +1229,13 @@ static  int make_move(int move, int move_flag)
             }
             
             // loop over bitboards opposite to the current side to move
-            for (int bb_piece = start_piece; bb_piece <= end_piece; bb_piece++)
+            for (int bitboard_piece = start_piece; bitboard_piece <= end_piece; bitboard_piece++)
             {
                 // if there's a piece on the target square
-                if (get_bit(bitboards[bb_piece], target_square))
+                if (get_bit(bitboards[bitboard_piece], target_square))
                 {
                     // remove it from corresponding bitboard
-                    pop_bit(bitboards[bb_piece], target_square);
+                    pop_bit(bitboards[bitboard_piece], target_square);
                     break;
                 }
             }
@@ -1355,6 +1355,7 @@ static  int make_move(int move, int move_flag)
             // don't make it
             return 0;
     }
+    return 0;
 }
 
 // generate all moves
@@ -1407,9 +1408,8 @@ static  void generate_moves(moves *move_list)
                         {
                             // quiet pawn move, unless there is a piece on the target space
                                 add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
-                            
-                            // two spaces ahead pawn move
-                            if ((source_space >= a2 && source_space <= h2) && !get_bit(occupancies[both], target_space - 8))
+                                // double pawn push
+                                if ((source_space >= a2 && source_space <= h2) && !get_bit(occupancies[both], target_space - 8))
                                 add_move(move_list, encode_move(source_space, target_space - 8, piece, 0, 0, 1, 0, 0));
 
                         }
@@ -1524,7 +1524,7 @@ static  void generate_moves(moves *move_list)
                             add_move(move_list, encode_move(source_space, target_space, piece, 0, 0, 0, 0, 0));
                             
                             // two spaces ahead pawn move
-                            if ((source_space >= a7 && source_space <= h7) && !get_bit(occupancies[both], target_space + 8)) {
+                            if ((source_space >= a7 && source_space <= h7) && !get_bit(occupancies[both], (target_space + 8))) {
                             if (!get_bit(occupancies[both], target_space)) { // check if the space in front of the pawn is also unoccupied
                             add_move(move_list, encode_move(source_space, target_space + 8, piece, 0, 0, 1, 0, 0));
                          }
@@ -1902,13 +1902,13 @@ Evaluation
 
 int material_score[12] = {
     100,      // white pawn score
-    300,      // white knight scrore
+    300,      // white knight score
     350,      // white bishop score
     500,      // white rook score
    1000,      // white queen score
   10000,      // white king score
    -100,      // black pawn score
-   -300,      // black knight scrore
+   -300,      // black knight score
    -350,      // black bishop score
    -500,      // black rook score
   -1000,      // black queen score
@@ -1930,14 +1930,14 @@ const int pawn_score[64] =
 // knight positional score
 const int knight_score[64] = 
 {
-    -5,   0,   0,   0,   0,   0,   0,  -5,
-    -5,   0,   0,  10,  10,   0,   0,  -5,
-    -5,   5,  20,  20,  20,  20,   5,  -5,
-    -5,  10,  20,  30,  30,  20,  10,  -5,
-    -5,  10,  20,  30,  30,  20,  10,  -5,
-    -5,   5, -10,  10,  10,  -10,   5,  -5,
-    -5,   0,   0,   0,   0,   0,   0,  -5,
-    -5, -10,   0,   0,   0,   0, -10,  -5
+    -50,   0,   0,   0,   0,   0,   0,  -50,
+    -50,   0,   0,  10,  10,   0,   0,  -50,
+    -50,   5,  20,  20,  20,  20,   5,  -50,
+    -50,  10,  20,  30,  30,  20,  10,  -50,
+    -50,  10,  20,  30,  30,  20,  10,  -50,
+    -50,   0, -10,  10,  10,  -10,   0,  -50,
+    -50,   0,   0,   0,   0,   0,   0,  -50,
+    -50, 0,   0,   0,   0,   0,      0, -50
 };
 
 // bishop positional score
@@ -2037,7 +2037,7 @@ static inline int evaluate()
             // add score
             score = material_score[piece];
 
-            // positional piece scroes
+            // positional piece scores
             switch (piece)
             {
                 // evaluate white
@@ -2063,7 +2063,7 @@ static inline int evaluate()
     }
 
 // return final evaluation score based on side
-   return (side == white) ? score : -score;
+
 
 }
 
@@ -2078,28 +2078,251 @@ Search
 
 */
 
+/**********************************\
+ ==================================
+ 
+               Search
+ 
+ ==================================
+\**********************************/
+
+// most valuable victim & less valuable attacker
+
+/*
+                          
+    (Victims) Pawn Knight Bishop   Rook  Queen   King
+  (Attackers)
+        Pawn   105    205    305    405    505    605
+      Knight   104    204    304    404    504    604
+      Bishop   103    203    303    403    503    603
+        Rook   102    202    302    402    502    602
+       Queen   101    201    301    401    501    601
+        King   100    200    300    400    500    600
+*/
+
+// MVV LVA [attacker][victim]
+static int mvv_lva[12][12] = {
+ 	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
+	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
+	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
+	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
+	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
+	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600,
+
+	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
+	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
+	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
+	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
+	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
+	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600
+};
+
+// killer moves [id] (of killer) [ply]
+
+int killer_moves[2][64];
+
+// history moves [piece][space]
+int history_moves[12][64];
+
 // half move counter
 int ply;
 
 // best move
 int best_move;
 
-static inline int negamax(int alpha, int beta, int depth)
+static inline int score_move(int move)
 {
-    // recurrsion escapre condition
-    if (depth == 0)
-        // return evaluation
-        return evaluate();
+    // score capture move
+    if (get_move_capture(move))
+    {
+        // init target piece
+        int target_piece = -1;
+        
+        // pick up bitboard piece index ranges depending on side
+        int start_piece, end_piece;
+        
+        // pick up side to move
+        if (side == white) { start_piece = p; end_piece = k; }
+        else { start_piece = P; end_piece = K; }
+        
+        // loop over bitboards opposite to the current side to move
+        for (int bitboard_piece = start_piece; bitboard_piece <= end_piece; bitboard_piece++)
+        {
+            // if there's a piece on the target square
+            if (get_bit(bitboards[bitboard_piece], get_move_target(move)))
+            {
+                // remove it from corresponding bitboard
+                target_piece = bitboard_piece;
+                break;
+            }
+        }
+                
+        // score move by MVV LVA lookup [source piece][target piece]
+        return mvv_lva[get_move_piece(move)][target_piece] + 10000; // add bonus for capture move
+    }
     
+    // score quiet move
+    else
+    {
+        // score 1st killer move
+    }
+    
+    return 0;
+}
+
+
+static inline int sort_moves(moves *move_list)
+{
+    // move scores
+    int move_scores[move_list->count];
+    
+    // score all the moves within a move list
+    for (int count = 0; count < move_list->count; count++)
+        // score move
+        move_scores[count] = score_move(move_list->moves[count]);
+    
+    // loop over current move within a move list
+    for (int current_move = 0; current_move < move_list->count; current_move++)
+    {
+        // loop over next move within a move list
+        for (int next_move = current_move + 1; next_move < move_list->count; next_move++)
+        {
+            // compare current and next move scores
+            if (move_scores[current_move] < move_scores[next_move])
+            {
+                // swap scores
+                int temp_score = move_scores[current_move];
+                move_scores[current_move] = move_scores[next_move];
+                move_scores[next_move] = temp_score;
+                
+                // swap moves
+                int temp_move = move_list->moves[current_move];
+                move_list->moves[current_move] = move_list->moves[next_move];
+                move_list->moves[next_move] = temp_move;
+            }
+        }
+    }
+}
+
+// print move scores
+void print_move_scores(moves *move_list)
+{
+    printf("     Move scores:\n\n");
+        
+    // loop over moves within a move list
+    for (int count = 0; count <= move_list->count; count++)
+    {
+        printf("     move: ");
+        print_move(move_list->moves[count]);
+        printf(" score: %d\n", score_move(move_list->moves[count]));
+    }
+}
+
+// quiescence search
+static inline int quiescence(int alpha, int beta)
+{
     // increment nodes count
     nodes++;
 
-    // is king in check?
-    int in_check = is_space_attacked((side == white) ? get_leastsigbit(bitboards[K]) : get_leastsigbit(bitboards[k]), side ^ 1);
+    // evaluate position
+    int evaluation = evaluate();
+    
+    // fail-hard beta cutoff
+    if (evaluation >= beta)
+    {
+        // node (move) fails high
+        return beta;
+    }
+    
+    // found a better move
+    if (evaluation > alpha)
+    {
+        // PV node (move)
+        alpha = evaluation;
+    }
+    
+    // create move list instance
+    moves move_list[1];
+    
+    // generate moves
+    generate_moves(move_list);
+    
+sort_moves(move_list);
+
+    // loop over moves within a movelist
+    for (int count = 0; count < move_list->count; count++)
+    {
+        // preserve board state
+        board_copy();
+        
+        // increment ply
+        ply++;
+        
+        // make sure to make only legal moves
+        if (make_move(move_list->moves[count], only_capture) == 0)
+        {
+            // decrement ply
+            ply--;
+            
+            // skip to next move
+            continue;
+            
+        }
+
+        // score current move
+        int score = -quiescence(-beta, -alpha);
+        
+        
+        // decrement ply
+        ply--;
+
+        // take move back
+        board_back();
+        
+        // fail-hard beta cutoff
+        if (score >= beta)
+        {
+
+
+            // node (move) fails high
+            return beta;
+        }
+        
+        // found a better move
+        if (score > alpha)
+        {
+            // PV node (move)
+            alpha = score;
+            
+        }
+    }
+    
+    // node (move) fails low
+    return alpha;
+}
+
+// negamax alpha beta search
+static inline int negamax(int alpha, int beta, int depth)
+{
+    // recursion escapre condition
+    if (depth == 0)
+        // run quiescence search
+        return quiescence(alpha, beta);
+    
+    // increment nodes count
+    nodes++;
+    
+    // is king in check
+    int in_check = is_space_attacked((side == white) ? get_leastsigbit(bitboards[K]) : 
+                                                        get_leastsigbit(bitboards[k]),
+                                                        side ^ 1);
+    
+    // increase search depth if the king has been exposed into a check
+    if (in_check) depth++;
     
     // legal moves counter
-    int legal_moves = 0; 
-
+    int legal_moves = 0;
+    
     // best move so far
     int best_sofar;
     
@@ -2112,6 +2335,10 @@ static inline int negamax(int alpha, int beta, int depth)
     // generate moves
     generate_moves(move_list);
     
+    // sort moves
+    sort_moves(move_list);
+
+
     // loop over moves within a movelist
     for (int count = 0; count < move_list->count; count++)
     {
@@ -2130,7 +2357,7 @@ static inline int negamax(int alpha, int beta, int depth)
             // skip to next move
             continue;
         }
-
+            
         // increment legal moves
         legal_moves++;
         
@@ -2146,6 +2373,9 @@ static inline int negamax(int alpha, int beta, int depth)
         // fail-hard beta cutoff
         if (score >= beta)
         {
+                        // store killer moves
+            killer_moves[1][ply] = killer_moves[0][ply];
+            killer_moves[0][ply] = move_list->moves[count];
             // node (move) fails high
             return beta;
         }
@@ -2153,26 +2383,32 @@ static inline int negamax(int alpha, int beta, int depth)
         // found a better move
         if (score > alpha)
         {
+            // store history 
+            history_moves[get_move_piece(move_list->moves[count])][get_move_target(move_list->moves[count])] += depth;
             // PV node (move)
             alpha = score;
-            
+
             // if root move
             if (ply == 0)
                 // associate best move with the best score
                 best_sofar = move_list->moves[count];
         }
     }
-
-    // check if legal move
+    
+    // we don't have any legal moves to make in the current postion
     if (legal_moves == 0)
     {
-        // checkmate or stalemate
-        if (in_check) -49000 + ply;
-
+        // king is in check
+        if (in_check)
+            // return mating score (assuming closest distance to mating position)
+            return -49000 + ply;
+        
+        // king is not in check
         else
-            // stalemate
+            // return stalemate score
             return 0;
     }
+    
     // found better move
     if (old_alpha != alpha)
         // init best move
@@ -2199,7 +2435,7 @@ if (best_move)
 }
 }
 
-// search position for the best move
+
 
 
 
@@ -2214,64 +2450,78 @@ UCI
 */
 
 // parse user/gui move string input ( example: "a7a8q")
-int move_parse(char * move_string)
+int move_parse(char *move_string)
 {
+    // create move list instance
     moves move_list[1];
-
+    
+    // generate moves
     generate_moves(move_list);
-
-    // parse source space
-    int source_space = (move_string[0] - 'a') + (8 - (move_string[1] - '0')) * 8;
-
-    // parse target space
-    int target_space = (move_string[2] - 'a') + (8 - (move_string[3] - '0')) * 8;
-
-    // loop over moves within list
+    
+    // parse source square
+    int source_square = (move_string[0] - 'a') + (8 - (move_string[1] - '0')) * 8;
+    
+    // parse target square
+    int target_square = (move_string[2] - 'a') + (8 - (move_string[3] - '0')) * 8;
+    
+    // loop over the moves within a move list
     for (int move_count = 0; move_count < move_list->count; move_count++)
     {
-        int parsed_move = move_list->moves[move_count];
-
-        // check if move is legal
-        if (source_space == get_move_source(parsed_move) && target_space == get_move_target(parsed_move))
+        // init move
+        int move = move_list->moves[move_count];
+        
+        // make sure source & target squares are available within the generated move
+        if (source_square == get_move_source(move) && target_square == get_move_target(move))
         {
-            int promoted_piece = get_move_promoted(parsed_move);
+            // init promoted piece
+            int promoted_piece = get_move_promoted(move);
             
-            if (promoted_piece){
-
-            // types of promotions
-            if ((promoted_piece == 'Q' || promoted_piece == 'q') && move_string[4] == 'q')
-                return parsed_move;
-            else if ((promoted_piece == 'R' || promoted_piece == 'r') && move_string[4] == 'r')
-                return parsed_move;
-            else if ((promoted_piece == 'B' || promoted_piece == 'b') && move_string[4] == 'b')
-                return parsed_move;
-            else if ((promoted_piece == 'N' || promoted_piece == 'n') && move_string[4] == 'n')
-                return parsed_move;
-
-            // continue if promotion is not legal
-            continue;
+            // promoted piece is available
+            if (promoted_piece)
+            {
+                // promoted to queen
+                if ((promoted_piece == Q || promoted_piece == q) && move_string[4] == 'q')
+                    // return legal move
+                    return move;
+                
+                // promoted to rook
+                else if ((promoted_piece == R || promoted_piece == r) && move_string[4] == 'r')
+                    // return legal move
+                    return move;
+                
+                // promoted to bishop
+                else if ((promoted_piece == B || promoted_piece == b) && move_string[4] == 'b')
+                    // return legal move
+                    return move;
+                
+                // promoted to knight
+                else if ((promoted_piece == N || promoted_piece == n) && move_string[4] == 'n')
+                    // return legal move
+                    return move;
+                
+                // continue the loop on possible wrong promotions (e.g. "e7e8f")
+                continue;
             }
-
-             return parsed_move;
+            
+            // return legal move
+            return move;
         }
-       
     }
-
-    // return 0 if move is illegal
+    
+    // return illegal move
     return 0;
-    printf("source space: %s\n", space_to_coordinates[target_space]);
 }
 
 // uci position input
 
 // parse UCI "position" input
-void uci_position(char *command)
+void uci_position(const char *command)
 {
     // shift pointer to the right where next token begins
     command += 9;
     
     // init pointer to the current character in the command string
-    char *current_char = command;
+    const char *current_char = command;
     
     // parse UCI "startpos" command
     if (strncmp(command, "startpos", 8) == 0)
@@ -2296,7 +2546,7 @@ void uci_position(char *command)
             current_char += 4;
             
             // init chess board with position from FEN string
-            parse_fen(current_char);
+            parse_fen(const_cast<char*>(current_char));
         }
     }
     
@@ -2313,7 +2563,7 @@ void uci_position(char *command)
         while(*current_char)
         {
             // parse next move
-            int move = move_parse(current_char);
+            int move = move_parse(const_cast<char*>(current_char));
             
             // if no more moves
             if (move == 0)
@@ -2352,7 +2602,7 @@ void uci_go(char *command)
 
     char *current_depth = NULL;
 
-    if (current_depth = strstr(command, "depth"))
+    if ((current_depth = strstr(command, "depth")))
 
     depth = atoi(current_depth + 6);
 
@@ -2469,19 +2719,8 @@ int main()
     // init all
     init_all();
 
-    // debug mode variable
-    int debug = 0;
-    
-    // if debugging
-    if (debug)
-    {
-        // parse fen
-        parse_fen(tricky_position);
-        print_board();
-        search_position(2);
-    }
-    
-    else
+
+
         // connect to the GUI
         uci_loop();
 
