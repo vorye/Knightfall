@@ -30,7 +30,7 @@ using namespace std;
 #define killer_position "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1"
 #define cmk_position "r2q1rk1/ppp2ppp/2n1bn2/2b1p3/3pP3/3P1NPP/PPP1NPB1/R1BQ1RK1 b - - 0 9 "
 
-enum space {
+enum {
 a8, b8, c8, d8, e8, f8, g8, h8,
 a7, b7, c7, d7, e7, f7, g7, h7,
 a6, b6, c6, d6, e6, f6, g6, h6,
@@ -1195,8 +1195,8 @@ static int make_move(int move, int move_flag)
         board_copy();
         
         // parse move
-        int source_square = get_move_source(move);
-        int target_square = get_move_target(move);
+        int source_space = get_move_source(move);
+        int target_space = get_move_target(move);
         int piece = get_move_piece(move);
         int promoted_piece = get_move_promoted(move);
         int capture = get_move_capture(move);
@@ -1205,8 +1205,8 @@ static int make_move(int move, int move_flag)
         int castling = get_move_castling(move);
         
         // move piece
-        pop_bit(bitboards[piece], source_square);
-        set_bit(bitboards[piece], target_square);
+        pop_bit(bitboards[piece], source_space);
+        set_bit(bitboards[piece], target_space);
         
         // handling capture moves
         if (capture)
@@ -1231,11 +1231,11 @@ static int make_move(int move, int move_flag)
             // loop over bitboards opposite to the current side to move
             for (int bitboard_piece = start_piece; bitboard_piece <= end_piece; bitboard_piece++)
             {
-                // if there's a piece on the target square
-                if (get_bit(bitboards[bitboard_piece], target_square))
+                // if there's a piece on the target space
+                if (get_bit(bitboards[bitboard_piece], target_space))
                 {
                     // remove it from corresponding bitboard
-                    pop_bit(bitboards[bitboard_piece], target_square);
+                    pop_bit(bitboards[bitboard_piece], target_space);
                     break;
                 }
             }
@@ -1244,37 +1244,37 @@ static int make_move(int move, int move_flag)
         // handle pawn promotions
         if (promoted_piece)
         {
-            // erase the pawn from the target square
-            pop_bit(bitboards[(side == white) ? P : p], target_square);
+            // erase the pawn from the target space
+            pop_bit(bitboards[(side == white) ? P : p], target_space);
             
             // set up promoted piece on chess board
-            set_bit(bitboards[promoted_piece], target_square);
+            set_bit(bitboards[promoted_piece], target_space);
         }
         
         // handle enpassant captures
         if (enpass)
         {
             // erase the pawn depending on side to move
-            (side == white) ? pop_bit(bitboards[p], target_square + 8) :
-                              pop_bit(bitboards[P], target_square - 8);
+            (side == white) ? pop_bit(bitboards[p], target_space + 8) :
+                              pop_bit(bitboards[P], target_space - 8);
         }
         
-        // reset enpassant square
+        // reset enpassant space
         enpassant = no_space;
         
         // handle double pawn push
         if (double_push)
         {
             // set enpassant aquare depending on side to move
-            (side == white) ? (enpassant = target_square + 8) :
-                              (enpassant = target_square - 8);
+            (side == white) ? (enpassant = target_space + 8) :
+                              (enpassant = target_space - 8);
         }
         
         // handle castling moves
         if (castling)
         {
-            // switch target square
-            switch (target_square)
+            // switch target space
+            switch (target_space)
             {
                 // white castles king side
                 case (g1):
@@ -1307,8 +1307,8 @@ static int make_move(int move, int move_flag)
         }
         
         // update castling rights
-        castle &= castling_rights[source_square];
-        castle &= castling_rights[target_square];
+        castle &= castling_rights[source_space];
+        castle &= castling_rights[target_space];
 
         // rsetting occupancies
         memset(occupancies, 0ULL, 24);
@@ -1902,16 +1902,16 @@ Evaluation
 
 int material_score[12] = {
     100,      // white pawn score
-    300,      // white knight score
+    325,      // white knight score
     350,      // white bishop score
     500,      // white rook score
-   1000,      // white queen score
+    900,      // white queen score
   10000,      // white king score
    -100,      // black pawn score
-   -300,      // black knight score
+   -325,      // black knight score
    -350,      // black bishop score
    -500,      // black rook score
-  -1000,      // black queen score
+  -900,      // black queen score
  -10000,      // black king score
 };
 
@@ -1930,14 +1930,14 @@ const int pawn_score[64] =
 // knight positional score
 const int knight_score[64] = 
 {
-    -50,   0,   0,   0,   0,   0,   0,  -50,
-    -50,   0,   0,  10,  10,   0,   0,  -50,
-    -50,   5,  20,  20,  20,  20,   5,  -50,
-    -50,  10,  20,  30,  30,  20,  10,  -50,
-    -50,  10,  20,  30,  30,  20,  10,  -50,
-    -50,   0, -10,  10,  10,  -10,   0,  -50,
-    -50,   0,   0,   0,   0,   0,   0,  -50,
-    -50, 0,   0,   0,   0,   0,      0, -50
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5,   0,   0,  10,  10,   0,   0,  -5,
+    -5,   5,  20,  20,  20,  20,   5,  -5,
+    -5,  10,  20,  30,  30,  20,  10,  -5,
+    -5,  10,  20,  30,  30,  20,  10,  -5,
+    -5,   0, -10,  10,  10,  -10,   0,  -5,
+    -5,   0,   0,   0,   0,   0,   0,  -5,
+    -5, 0,   0,   0,   0,   0, 0,  -5
 };
 
 // bishop positional score
@@ -2010,63 +2010,62 @@ const int mirror_score[128] =
 
 static inline int evaluate()
 {
-    // evaluation score
+    // static evaluation score
     int score = 0;
     
-    // current copy
+    // current pieces bitboard copy
     U64 bitboard;
-
-    // initialise
+    
+    // init piece & space
     int piece, space;
-
-    // loop over all pieces bitboards
-    for (int bitboard_piece = P; bitboard_piece <= k; bitboard_piece++)
+    
+    // loop over piece bitboards
+    for (int bitboard_pieces = P; bitboard_pieces <= k; bitboard_pieces++)
     {
         // init piece bitboard copy
-        bitboard = bitboards[bitboard_piece];
-
-        // loop over piece bitboard copy
+        bitboard = bitboards[bitboard_pieces];
+        
+        // loop over pieces within a bitboard
         while (bitboard)
         {
             // init piece
-            piece = bitboard_piece;
-
-            // init piece
+            piece = bitboard_pieces;
+            
+            // init space
             space = get_leastsigbit(bitboard);
-
-            // add score
-            score = material_score[piece];
-
-            // positional piece scores
+            
+            // score material weights
+            score += material_score[piece];
+            
+            // score positional piece scores
             switch (piece)
             {
-                // evaluate white
+                // evaluate white pieces
                 case P: score += pawn_score[space]; break;
                 case N: score += knight_score[space]; break;
                 case B: score += bishop_score[space]; break;
                 case R: score += rook_score[space]; break;
                 case Q: score += queen_score[space]; break;
                 case K: score += king_score[space]; break;
-                // evaluate black
-                case p: score += pawn_score[mirror_score[space]]; break;
-                case n: score += knight_score[mirror_score[space]]; break;
-                case b: score += bishop_score[mirror_score[space]]; break;
-                case r: score += rook_score[mirror_score[space]]; break;
+
+                // evaluate black pieces
+                case p: score -= pawn_score[mirror_score[space]]; break;
+                case n: score -= knight_score[mirror_score[space]]; break;
+                case b: score -= bishop_score[mirror_score[space]]; break;
+                case r: score -= rook_score[mirror_score[space]]; break;
                 case q: score += queen_score[mirror_score[space]]; break;
-                case k: score += king_score[mirror_score[space]]; break;
-
+                case k: score -= king_score[mirror_score[space]]; break;
             }
-
+            
+            
             // pop ls1b
             pop_bit(bitboard, space);
         }
     }
-
-// return final evaluation score based on side
-
-
+    
+    // return final evaluation based on side
+    return (side == white) ? score : -score;
 }
-
 
 /*
 
@@ -2090,31 +2089,41 @@ Search
 
 /*
                           
-    (Victims) Pawn Knight Bishop   Rook  Queen   King
-  (Attackers)
-        Pawn   105    205    305    405    505    605
-      Knight   104    204    304    404    504    604
-      Bishop   103    203    303    403    503    603
-        Rook   102    202    302    402    502    602
-       Queen   101    201    301    401    501    601
-        King   100    200    300    400    500    600
+P - 6002 20225 20250 20400 20800 26900
+N - 4775  6004 20025 20175 20575 26675
+B - 4750  4975  6006 20150 20550 26650
+R - 4600  4825  4850  6008 20400 26500
+Q - 4200  4425  4450  4600  6010 26100
+K - 3100  3325  3350  3500  3900 26000
 */
 
 // MVV LVA [attacker][victim]
 static int mvv_lva[12][12] = {
- 	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
-	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
-	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
-	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
-	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
-	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600,
+ 	6002, 20225, 20250, 20400, 20800, 26900, 
+	4775,  6004, 20025, 20175, 20575, 26675,  
+	4750,  4975,  6006, 20150, 20550, 26650,  
+	4600,  4825,  4850,  6008, 20400, 26500,  
+	4200,  4425,  4450,  4600,  6010, 26100, 
+	3100,  3325,  3350,  3500,  3900, 2600, 
+    6002, 20225, 20250, 20400, 20800, 26900, 
+	4775,  6004, 20025, 20175, 20575, 26675,  
+	4750,  4975,  6006, 20150, 20550, 26650,  
+	4600,  4825,  4850,  6008, 20400, 26500,  
+	4200,  4425,  4450,  4600,  6010, 26100, 
+	3100,  3325,  3350,  3500,  3900, 2600,
+    6002, 20225, 20250, 20400, 20800, 26900, 
+	4775,  6004, 20025, 20175, 20575, 26675,  
+	4750,  4975,  6006, 20150, 20550, 26650,  
+	4600,  4825,  4850,  6008, 20400, 26500,  
+	4200,  4425,  4450,  4600,  6010, 26100, 
+	3100,  3325,  3350,  3500,  3900, 2600, 
+    6002, 20225, 20250, 20400, 20800, 26900, 
+	4775,  6004, 20025, 20175, 20575, 26675,  
+	4750,  4975,  6006, 20150, 20550, 26650,  
+	4600,  4825,  4850,  6008, 20400, 26500,  
+	4200,  4425,  4450,  4600,  6010, 26100, 
+	3100,  3325,  3350,  3500,  3900, 2600, 
 
-	105, 205, 305, 405, 505, 605,  105, 205, 305, 405, 505, 605,
-	104, 204, 304, 404, 504, 604,  104, 204, 304, 404, 504, 604,
-	103, 203, 303, 403, 503, 603,  103, 203, 303, 403, 503, 603,
-	102, 202, 302, 402, 502, 602,  102, 202, 302, 402, 502, 602,
-	101, 201, 301, 401, 501, 601,  101, 201, 301, 401, 501, 601,
-	100, 200, 300, 400, 500, 600,  100, 200, 300, 400, 500, 600
 };
 
 // killer moves [id] (of killer) [ply]
@@ -2136,7 +2145,7 @@ static inline int score_move(int move)
     if (get_move_capture(move))
     {
         // init target piece
-        int target_piece = -1;
+        int target_piece = P;
         
         // pick up bitboard piece index ranges depending on side
         int start_piece, end_piece;
@@ -2148,7 +2157,7 @@ static inline int score_move(int move)
         // loop over bitboards opposite to the current side to move
         for (int bitboard_piece = start_piece; bitboard_piece <= end_piece; bitboard_piece++)
         {
-            // if there's a piece on the target square
+            // if there's a piece on the target space
             if (get_bit(bitboards[bitboard_piece], get_move_target(move)))
             {
                 // remove it from corresponding bitboard
@@ -2158,18 +2167,65 @@ static inline int score_move(int move)
         }
                 
         // score move by MVV LVA lookup [source piece][target piece]
-        return mvv_lva[get_move_piece(move)][target_piece] + 10000; // add bonus for capture move
+        return mvv_lva[get_move_piece(move)][target_piece] + 100;
     }
     
     // score quiet move
     else
     {
         // score 1st killer move
+        if (killer_moves[0][ply] == move) return 90;
+
+        // score 2nd killer move
+        if (killer_moves[1][ply] == move) return 80;
+
+        // score history move
+        else return history_moves[get_move_piece(move)][get_move_target(move)];
     }
     
     return 0;
 }
 
+void merge(moves *move_list, int start, int mid, int end, int move_scores[]) {
+    int i = start, j = mid+1, k = start;
+    int temp_move_list[move_list->count];
+
+    while (i <= mid && j <= end) {
+        if (move_scores[i] < move_scores[j]) {
+            temp_move_list[k] = move_list->moves[i];
+            i++;
+        } else {
+            temp_move_list[k] = move_list->moves[j];
+            j++;
+        }
+        k++;
+    }
+
+    while (i <= mid) {
+        temp_move_list[k] = move_list->moves[i];
+        i++;
+        k++;
+    }
+
+    while (j <= end) {
+        temp_move_list[k] = move_list->moves[j];
+        j++;
+        k++;
+    }
+
+    for (int x = start; x <= end; x++) {
+        move_list->moves[x] = temp_move_list[x];
+    }
+}
+
+void merge_sort(moves *move_list, int start, int end, int move_scores[]) {
+    if (start < end) {
+        int mid = (start + end) / 2;
+        merge_sort(move_list, start, mid, move_scores);
+        merge_sort(move_list, mid+1, end, move_scores);
+        merge(move_list, start, mid, end, move_scores);
+    }
+}
 
 static inline int sort_moves(moves *move_list)
 {
@@ -2202,6 +2258,7 @@ static inline int sort_moves(moves *move_list)
             }
         }
     }
+    return 0;
 }
 
 // print move scores
@@ -2210,13 +2267,14 @@ void print_move_scores(moves *move_list)
     printf("     Move scores:\n\n");
         
     // loop over moves within a move list
-    for (int count = 0; count <= move_list->count; count++)
+    for (int count = 0; count < move_list->count; count++)
     {
         printf("     move: ");
         print_move(move_list->moves[count]);
         printf(" score: %d\n", score_move(move_list->moves[count]));
     }
 }
+
 
 // quiescence search
 static inline int quiescence(int alpha, int beta)
@@ -2247,7 +2305,7 @@ static inline int quiescence(int alpha, int beta)
     // generate moves
     generate_moves(move_list);
     
-sort_moves(move_list);
+    sort_moves(move_list);
 
     // loop over moves within a movelist
     for (int count = 0; count < move_list->count; count++)
@@ -2266,12 +2324,10 @@ sort_moves(move_list);
             
             // skip to next move
             continue;
-            
         }
 
         // score current move
         int score = -quiescence(-beta, -alpha);
-        
         
         // decrement ply
         ply--;
@@ -2336,8 +2392,8 @@ static inline int negamax(int alpha, int beta, int depth)
     generate_moves(move_list);
     
     // sort moves
+    
     sort_moves(move_list);
-
 
     // loop over moves within a movelist
     for (int count = 0; count < move_list->count; count++)
@@ -2357,7 +2413,7 @@ static inline int negamax(int alpha, int beta, int depth)
             // skip to next move
             continue;
         }
-            
+        
         // increment legal moves
         legal_moves++;
         
@@ -2387,7 +2443,8 @@ static inline int negamax(int alpha, int beta, int depth)
             history_moves[get_move_piece(move_list->moves[count])][get_move_target(move_list->moves[count])] += depth;
             // PV node (move)
             alpha = score;
-
+            
+            
             // if root move
             if (ply == 0)
                 // associate best move with the best score
@@ -2458,11 +2515,11 @@ int move_parse(char *move_string)
     // generate moves
     generate_moves(move_list);
     
-    // parse source square
-    int source_square = (move_string[0] - 'a') + (8 - (move_string[1] - '0')) * 8;
+    // parse source space
+    int source_space = (move_string[0] - 'a') + (8 - (move_string[1] - '0')) * 8;
     
-    // parse target square
-    int target_square = (move_string[2] - 'a') + (8 - (move_string[3] - '0')) * 8;
+    // parse target space
+    int target_space = (move_string[2] - 'a') + (8 - (move_string[3] - '0')) * 8;
     
     // loop over the moves within a move list
     for (int move_count = 0; move_count < move_list->count; move_count++)
@@ -2470,8 +2527,8 @@ int move_parse(char *move_string)
         // init move
         int move = move_list->moves[move_count];
         
-        // make sure source & target squares are available within the generated move
-        if (source_square == get_move_source(move) && target_square == get_move_target(move))
+        // make sure source & target spaces are available within the generated move
+        if (source_space == get_move_source(move) && target_space == get_move_target(move))
         {
             // init promoted piece
             int promoted_piece = get_move_promoted(move);
@@ -2719,8 +2776,31 @@ int main()
     // init all
     init_all();
 
-
-
+    // debug mode variable
+    int debug = 1;
+    
+    // if debugging
+    if (debug)
+    {
+        // parse fen
+        parse_fen("rn1q2nr/1b2k1bp/3pppp1/p1B5/P1B5/1P2P2Q/2P2PPP/RN2K1NR b KQ - 1 12");
+        print_board();
+        search_position(5);
+        
+        // create move list instance
+        moves move_list[1];
+        
+        // generate moves
+        generate_moves(move_list);
+        
+        // sort move
+        sort_moves(move_list);
+        
+        // print move scores
+        print_move_scores(move_list);
+    }
+    
+    else
         // connect to the GUI
         uci_loop();
 
