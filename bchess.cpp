@@ -862,7 +862,7 @@ void initialise_sliders(int bishop)
 }
 
 // get bishop attacks 
-static  U64 get_bishop_attacks(int space, U64 occupancy){
+static inline U64 get_bishop_attacks(int space, U64 occupancy){
 
     occupancy &= bishop_masks[space];
     occupancy *= bishopmagics[space];
@@ -872,7 +872,7 @@ static  U64 get_bishop_attacks(int space, U64 occupancy){
 }
 
 // get rook attacks
-static  U64 get_rook_attacks(int space, U64 occupancy){
+static inline U64 get_rook_attacks(int space, U64 occupancy){
 
     occupancy &= rook_masks[space];
     occupancy *= rookmagics[space];
@@ -883,7 +883,7 @@ static  U64 get_rook_attacks(int space, U64 occupancy){
 
 // get queen attacks
 
-static  U64 get_queen_attacks(int space, U64 occupancy)
+static inline U64 get_queen_attacks(int space, U64 occupancy)
 {
     // init result attacks bitboard
     U64 queen_attacks = 0ULL;
@@ -1398,10 +1398,10 @@ static  void generate_moves(moves *move_list)
                         if (source_space >= a7 && source_space <= h7) 
 
                         {
-                            add_move(move_list, encode_move(source_space, target_space, piece, Q, 0, 0, 0, 0));
-                            add_move(move_list, encode_move(source_space, target_space, piece, R, 0, 0, 0, 0));
-                            add_move(move_list, encode_move(source_space, target_space, piece, B, 0, 0, 0, 0));
-                            add_move(move_list, encode_move(source_space, target_space, piece, N, 0, 0, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, Q, 0, 1, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, R, 0, 1, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, B, 0, 1, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, N, 0, 1, 0, 0));
                         }
                         
                         else
@@ -1512,10 +1512,10 @@ static  void generate_moves(moves *move_list)
                         // pawn promotion
                         if (source_space >= a2 && source_space <= h2)
                         {
-                            add_move(move_list, encode_move(source_space, target_space, piece, q, 0, 0, 0, 0));
-                            add_move(move_list, encode_move(source_space, target_space, piece, r, 0, 0, 0, 0));
-                            add_move(move_list, encode_move(source_space, target_space, piece, b, 0, 0, 0, 0));
-                            add_move(move_list, encode_move(source_space, target_space, piece, n, 0, 0, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, q, 0, 1, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, r, 0, 1, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, b, 0, 1, 0, 0));
+                            add_move(move_list, encode_move(source_space, target_space, piece, n, 0, 1, 0, 0));
                         }
                         
                         else
