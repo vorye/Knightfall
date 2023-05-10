@@ -9,19 +9,18 @@ HEADERS
 */
 
 #include <iostream>
-#include <stdio.h>
 #include <string>
 #include <windows.h>
-#include <cstdint>
-#include <bitset>
 #include <stdint.h>
 #include <unordered_map>
 #include <chrono>
 #include <stdlib.h>
 
+
 // defined bitboard type
 #define U64 unsigned long long  
 using namespace std;
+
 
 // FEN debug positions
 #define empty_board "8/8/8/8/8/8/8/8 b - - "
@@ -47,18 +46,12 @@ enum {
   white, black, both
 };
 
-// bishop and rook
-enum {
-  rook, bishop
-};
-
 enum {
     wk = 1, wq = 2, bk = 4, bq = 8
 };
 
+
 // encoding pieces
-
-
 
 const char *space_to_coordinates[] = { 
     "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8",
@@ -107,8 +100,6 @@ char *unicode_pieces[12] = {"♙", "♘", "♗", "♖", "♕", "♔", "♟︎", 
     {b, static_cast<char>('b')},
     {n, static_cast<char>('n')}
 };
-
-   
 
 /*
 ------
@@ -159,7 +150,7 @@ BIT COUNT + LEAST SIG BIT
 
 */
 
-static  int count_bits(U64 bitboard)
+static int count_bits(U64 bitboard)
 {
 return __builtin_popcountll(bitboard);
 }
@@ -471,8 +462,7 @@ TABLES
 */
 
 // table to store the pawn attacks for each space and side
-U64 pawn_captures[2][64]; 
-
+U64 pawn_captures[2][64];   
 
 // table to store the king attacks
 
@@ -2126,21 +2116,61 @@ static int mvv_lva[12][12] = {
 
 };
 
-// killer moves [id] (of killer) [ply]
+// Set the max_ply as a const value
+const int max_ply = 64;
 
-int killer_moves[2][64];
+// killer moves [id] (of killer) [ply]
+// Declare the array with the constant value
+int killer_moves[2][max_ply];
 
 // history moves [piece][space]
 int history_moves[12][64];
 
+// pv length [ply]
+int pv_length[max_ply];
+
+// pv table
+int pv_table[max_ply][max_ply];
+
+// follow pv flag
+int follow_pv, score_pv;
+
 // half move counter
 int ply;
 
-// best move
-int best_move;
+static inline void enable_pv_scoring(moves *move_list)
+{
+
+    follow_pv = 0;
+
+    for (int count = 0; count < move_list->count; count++)
+    {
+        if (pv_table[0][ply] == move_list->moves[count])
+        {
+            score_pv = 1;
+
+            follow_pv = 1;
+        }
+    }
+
+}
 
 static inline int score_move(int move)
 {
+    if (score_pv)
+    {
+        // make sure we are dealing with a PV move
+        if (score_pv)
+        {
+            if (pv_table[0][ply] == move)
+            {
+                score_pv = 0;
+
+                return 200;
+            }
+        }
+    }
+
     // score capture move
     if (get_move_capture(move))
     {
@@ -2167,7 +2197,7 @@ static inline int score_move(int move)
         }
                 
         // score move by MVV LVA lookup [source piece][target piece]
-        return mvv_lva[get_move_piece(move)][target_piece] + 100;
+        return mvv_lva[get_move_piece(move)][target_piece] + 1000;
     }
     
     // score quiet move
@@ -2360,10 +2390,19 @@ static inline int quiescence(int alpha, int beta)
 // negamax alpha beta search
 static inline int negamax(int alpha, int beta, int depth)
 {
+    int found_pv = 0;
+
+    pv_length[ply] = ply;
+
     // recursion escapre condition
     if (depth == 0)
         // run quiescence search
         return quiescence(alpha, beta);
+
+    // too deep
+    if (ply > max_ply - 1)
+
+    return evaluate();
     
     // increment nodes count
     nodes++;
@@ -2379,18 +2418,19 @@ static inline int negamax(int alpha, int beta, int depth)
     // legal moves counter
     int legal_moves = 0;
     
-    // best move so far
-    int best_sofar;
-    
-    // old value of alpha
-    int old_alpha = alpha;
-    
     // create move list instance
     moves move_list[1];
     
     // generate moves
     generate_moves(move_list);
     
+    //
+    if (follow_pv)
+    {
+        // enable pv move score
+        enable_pv_scoring(move_list);
+    }
+
     // sort moves
     
     sort_moves(move_list);
@@ -2413,13 +2453,26 @@ static inline int negamax(int alpha, int beta, int depth)
             // skip to next move
             continue;
         }
-        
+        int score;
+
         // increment legal moves
         legal_moves++;
-        
+        if (found_pv)
+        {
+
+            score = -negamax(-alpha - 1, -alpha, depth - 1);
+
+            if ((score > alpha) && (score < beta))
+            
+                score = -negamax(-beta, -alpha, depth - 1);
+            
+
+        }
+        else
         // score current move
-        int score = -negamax(-beta, -alpha, depth - 1);
-        
+        {
+        score = -negamax(-beta, -alpha, depth - 1);
+        }
         // decrement ply
         ply--;
 
@@ -2429,9 +2482,13 @@ static inline int negamax(int alpha, int beta, int depth)
         // fail-hard beta cutoff
         if (score >= beta)
         {
+            // on quiet moves
+            if (get_move_capture(move_list->moves[count]) == 0)
+        {
                         // store killer moves
             killer_moves[1][ply] = killer_moves[0][ply];
             killer_moves[0][ply] = move_list->moves[count];
+        }
             // node (move) fails high
             return beta;
         }
@@ -2440,15 +2497,23 @@ static inline int negamax(int alpha, int beta, int depth)
         if (score > alpha)
         {
             // store history 
+            
             history_moves[get_move_piece(move_list->moves[count])][get_move_target(move_list->moves[count])] += depth;
             // PV node (move)
             alpha = score;
             
+            // write the PV move
+            pv_table[ply][ply] = move_list->moves[count];
+
+            // copy from a deeper ply into current ply
+            for (int next_ply = ply + 1; next_ply < pv_length[ply + 1]; next_ply++)
+                pv_table[ply][next_ply] = pv_table[ply + 1][next_ply];
+
+                // adjust the length
+                pv_length[ply] = pv_length[ply + 1];
             
             // if root move
-            if (ply == 0)
-                // associate best move with the best score
-                best_sofar = move_list->moves[count];
+
         }
     }
     
@@ -2466,10 +2531,7 @@ static inline int negamax(int alpha, int beta, int depth)
             return 0;
     }
     
-    // found better move
-    if (old_alpha != alpha)
-        // init best move
-        best_move = best_sofar;
+
     
     // node (move) fails low
     return alpha;
@@ -2478,18 +2540,48 @@ static inline int negamax(int alpha, int beta, int depth)
 // search position for the best move
 void search_position(int depth)
 {
+
+    int score = 0;
+
+       // set nodes
+
+    nodes = 0;
+
+    // reset follow pv
+    follow_pv = 0;
+    score_pv = 0;
+
+    // clear helper data 
+    memset(killer_moves, 0, sizeof(killer_moves));
+    memset(history_moves, 0, sizeof(history_moves));
+    memset(pv_table, 0, sizeof(pv_table));
+    memset(pv_length, 0, sizeof(pv_length));
+
+    // iterative deepening
+    for (int current_depth = 1; current_depth < depth; current_depth++)
+{
+    // enable follow pv
+    follow_pv = 1;
+
+    
     // find best move within a given position
-    int score = negamax(-50000, 50000, depth);
+    score = negamax(-50000, 50000, current_depth);
     
     // best move placeholder
-if (best_move)
-{
-    printf("info score cp %d depth %d nodes %ld\n", score, depth, nodes);
 
-    printf("bestmove ");
-    print_move(best_move);
+    printf("info score cp %d depth %d nodes %ld pv \n", score, current_depth, nodes);
+
+    // loop over moves within a PV line
+    for (int count = 0; count < pv_length[0]; count++)
+    {
+        print_move(pv_table[0][count]);
+        printf(" ");
+    }
     printf("\n");
 }
+    printf("bestmove ");
+    print_move(pv_table[0][0]);
+    printf("\n");
 }
 
 
@@ -2661,15 +2753,13 @@ void uci_go(char *command)
 
     if ((current_depth = strstr(command, "depth")))
 
-    depth = atoi(current_depth + 6);
+    depth = atoi(current_depth + 7);
 
     else
     
-        depth = 6;
+        depth = 7;
     
     search_position(depth);
-    
-
 }
 
 void uci_loop()
@@ -2783,7 +2873,7 @@ int main()
     if (debug)
     {
         // parse fen
-        parse_fen("rn1q2nr/1b2k1bp/3pppp1/p1B5/P1B5/1P2P2Q/2P2PPP/RN2K1NR b KQ - 1 12");
+        parse_fen("rnbqkbnr/pppp1ppp/4p3/8/8/1P2P3/P1PP1PPP/RNBQKBNR b KQkq - 0 2");
         print_board();
         search_position(5);
         
